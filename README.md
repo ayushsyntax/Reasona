@@ -1,3 +1,4 @@
+
 ---
 
 # 🧠 Reasona: A Self-Correcting RAG System (HyDE + SEAL Inspired)
@@ -283,7 +284,7 @@ Reasona/
 
 ## YouTube Walkthrough
 
-[Watch the video walkthrough here](https://youtu.be/AZ5MW70HFck) 
+[Click Here](https://youtu.be/AZ5MW70HFck) 
 ---
 
 ## License
