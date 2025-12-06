@@ -1,39 +1,33 @@
 # Flow:
-# 1. Initializes a persistent Chroma vector database.
-# 2. Embeds documents using HuggingFace embeddings.
-# 3. Supports adding documents and retrieving relevant ones for RAG tasks.
+# 1. Initializes a fast persistent Chroma vector database.
+# 2. Uses lightweight HuggingFace embeddings for rapid encoding.
+# 3. Enables quick add/retrieve operations for RAG pipelines.
 
-import chromadb
 from langchain_chroma import Chroma
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
+import chromadb
+from typing import List, Optional
 
 class VectorStoreManager:
-    """Handles all vector database operations using local embeddings."""
-    
+    """Fast and efficient local vector database manager."""
+
     def __init__(self, path: str = "./data/chroma"):
-        """Initialize persistent vector storage"""
         self.client = chromadb.PersistentClient(path=path)
-        self.embeddings = HuggingFaceEmbeddings(
-            model_name="all-MiniLM-L6-v2"  
-        )
-    
+        self.embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+
     def get_retriever(self, collection_name: str = "docs"):
-        """Return a retriever for finding relevant documents"""
+        """Fast retriever for top-k relevant documents."""
+        return Chroma(
+            client=self.client,
+            collection_name=collection_name,
+            embedding_function=self.embeddings,
+        ).as_retriever(search_kwargs={"k": 3})
+
+    def add_documents(self, texts: List[str], metadatas: Optional[List[dict]] = None, collection_name: str = "docs"):
+        """Quickly add text chunks into vectorstore."""
         vectorstore = Chroma(
             client=self.client,
             collection_name=collection_name,
-            embedding_function=self.embeddings
+            embedding_function=self.embeddings,
         )
-        return vectorstore.as_retriever(search_kwargs={"k": 3})  
-    
-    def add_documents(self, texts: list, metadatas: list = None, collection_name: str = "docs"):
-        """Add new documents to the collection"""
-        vectorstore = Chroma(
-            client=self.client,
-            collection_name=collection_name,
-            embedding_function=self.embeddings
-        )
-        vectorstore.add_texts(
-            texts=texts,
-            metadatas=metadatas or [{}] * len(texts)
-        )
+        vectorstore.add_texts(texts=texts, metadatas=metadatas or [{}] * len(texts))

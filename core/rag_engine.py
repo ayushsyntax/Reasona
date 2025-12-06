@@ -1,9 +1,9 @@
 # Flow:
-# 1. Generates a hypothetical answer (HyDE) to improve retrieval.
-# 2. Retrieves context from the vector store.
-# 3. Produces an answer using RAG.
-# 4. Validates answer accuracy with a critic.
-# 5. Performs self-editing (SEAL) if the answer is incorrect and updates storage.
+# 1. Generates multiple hypothetical answers (HyDE*) to drive robust retrieval.
+# 2. Retrieves context using both the user query and hypotheses.
+# 3. Produces a concise, fact-rich answer from aggregated context.
+# 4. Uses a stricter critic to judge faithfulness and coherence.
+# 5. If incorrect, performs SEAL-style self-edit: improved chunk, QA pairs, and edit directives; persists for future learning.
 
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
@@ -12,119 +12,132 @@ from .llm_factory import get_llm
 import json
 
 class HyDE_SEAL_Engine:
-    """Combines HyDE (Hypothetical Document Embeddings) with SEAL (Self-Edit And Learn)."""
-    
-    def __init__(self, vector_manager: VectorStoreManager):
+    def __init__(self, vector_manager: VectorStoreManager, hyde_k: int = 3, top_k: int = 4):
         self.vector_manager = vector_manager
-    
-    def create_hyde_chain(self, llm):
-        """Generate hypothetical answers to guide document retrieval"""
-        hyde_prompt = ChatPromptTemplate.from_messages([
-            ("system", "Generate a helpful answer to this question. "
-                      "This will be used to find relevant documents."),
+        self.hyde_k = hyde_k
+        self.top_k = top_k
+
+    def _hyde_prompt(self):
+        return ChatPromptTemplate.from_messages([
+            ("system", "Produce a helpful, self-contained answer to guide retrieval. No disclaimers."),
             ("human", "Question: {question}")
         ])
-        return hyde_prompt | llm | StrOutputParser()
-    
-    def create_rag_chain(self, llm):
-        """Answer user questions using retrieved context"""
-        rag_prompt = ChatPromptTemplate.from_messages([
-            ("system", "Answer the question using only the provided context. "
-                      "If uncertain, say 'I don't have enough information'."),
-            ("human", "Context: {context}\n\nQuestion: {question}")
+
+    def _rag_prompt(self):
+        return ChatPromptTemplate.from_messages([
+            ("system",
+             "You are a factual, concise assistant. Use only the context to answer naturally.\n"
+             "Include short facts (figures/names) when helpful. If unsure, say \"I don't have enough information.\""),
+            ("human", "Context:\n{context}\n\nQuestion:\n{question}\n\nRespond in 3–5 sentences.")
         ])
-        return rag_prompt | llm | StrOutputParser()
-    
-    def create_critic_chain(self, llm):
-        """Evaluate if the generated answer is fully supported by the context"""
-        critic_prompt = ChatPromptTemplate.from_messages([
-            ("system", "You are a fact-checker. Analyze if the answer is fully "
-                      "supported by the context.\n\n"
-                      "Question: {question}\n"
-                      "Context: {context}\n"
-                      "Answer: {answer}\n\n"
-                      "Respond with only 'CORRECT' or 'INCORRECT'."),
-            ("human", "Verify the answer.")
+
+    def _critic_prompt(self):
+        return ChatPromptTemplate.from_messages([
+            ("system",
+             "You are a strict fact-checker. Judge if the Answer is fully supported by the Context.\n"
+             "Return JSON with fields: verdict ('CORRECT' or 'INCORRECT'), rationale (one sentence)."),
+            ("human", "Question: {question}\n\nContext:\n{context}\n\nAnswer:\n{answer}")
         ])
-        return critic_prompt | llm | StrOutputParser()
-    
-    def create_self_edit_chain(self, llm):
-        """Improve content and generate Q&A pairs if the answer is incorrect"""
-        edit_prompt = ChatPromptTemplate.from_messages([
-            ("system", "The provided answer was incorrect. Improve the context "
-                      "and create Q&A pairs for better learning.\n\n"
-                      "Original Context: {chunk}\n"
-                      "Question: {question}\n"
-                      "Wrong Answer: {wrong_answer}\n\n"
-                      "Respond in JSON format:\n"
-                      "{{\"improved_chunk\": \"...\", "
-                      "\"qa_pairs\": [{{\"question\": \"...\", \"answer\": \"...\"}}]}}"),
-            ("human", "Generate improved content.")
+
+    def _seal_edit_prompt(self):
+        return ChatPromptTemplate.from_messages([
+            ("system",
+             "Generate a self-edit to improve future answers.\n"
+             "Return JSON with keys:\n"
+             "  improved_chunk: revised, compact factual passage\n"
+             "  qa_pairs: list of {\"question\":\"...\",\"answer\":\"...\"}\n"
+             "  edit_directives: {\"augmentation\":[],\"notes\":\"...\"}\n"),
+            ("human",
+             "Original Context:\n{chunk}\n\nQuestion:\n{question}\n\nWrong Answer:\n{wrong_answer}\n\n"
+             "Create improved_chunk that directly supports the correct answer, 3–6 sentences.")
         ])
-        return edit_prompt | llm | StrOutputParser()
-    
-    def process_query(self, question: str, provider: str, model: str):
-        """Run the full RAG pipeline with HyDE and SEAL"""
-        llm = get_llm(provider, model)
+
+    def _run_chain(self, prompt, llm, **kwargs):
+        chain = prompt | llm | StrOutputParser()
+        return chain.invoke(kwargs)
+
+    def _generate_hypotheses(self, llm, question: str):
+        hyde_llm = get_llm("ollama" if hasattr(llm, "model") else "openai", getattr(llm, "model", ""), temperature=0.7)
+        prompt = self._hyde_prompt()
+        hypos = []
+        for _ in range(self.hyde_k):
+            hypos.append(self._run_chain(prompt, hyde_llm, question=question))
+        return hypos
+
+    def _retrieve(self, question: str, hypotheses: list):
         retriever = self.vector_manager.get_retriever()
-        
-        # Step 1: HyDE - Generate hypothetical answer for better retrieval
-        hyde_chain = self.create_hyde_chain(llm)
-        hypothetical_answer = hyde_chain.invoke({"question": question})
-        
-        # Step 2: Retrieve documents based on hypothesis
-        retrieved_docs = retriever.invoke(hypothetical_answer)
-        context = "\n\n".join([doc.page_content for doc in retrieved_docs])
-        
-        # Step 3: Generate final answer using RAG
-        rag_chain = self.create_rag_chain(llm)
-        answer = rag_chain.invoke({"context": context, "question": question})
-        
-        # Step 4: Critic evaluation
-        critic_chain = self.create_critic_chain(llm)
-        critique = critic_chain.invoke({
-            "question": question,
-            "context": context,
-            "answer": answer
-        }).strip().upper()
-        
+        seeds = [question] + hypotheses
+        docs = []
+        for q in seeds:
+            docs.extend(retriever.invoke(q))
+        uniq = []
+        seen = set()
+        for d in docs:
+            key = hash(d.page_content)
+            if key not in seen:
+                seen.add(key)
+                uniq.append(d)
+        return uniq[: self.top_k]
+
+    def process_query(self, question: str, provider: str, model: str):
+        llm = get_llm(provider, model)
+
+        hypos = self._generate_hypotheses(llm, question)
+        retrieved = self._retrieve(question, hypos)
+        context = "\n\n".join(d.page_content for d in retrieved) if retrieved else ""
+
+        answer = self._run_chain(self._rag_prompt(), llm, context=context, question=question)
+
+        critic_raw = self._run_chain(self._critic_prompt(), llm, question=question, context=context, answer=answer)
+        try:
+            critic = json.loads(critic_raw) if isinstance(critic_raw, str) else critic_raw
+            verdict = str(critic.get("verdict", "")).upper()
+        except Exception:
+            verdict = "CORRECT" if "I don't have enough information" not in answer else "INCORRECT"
+
         result = {
             "answer": answer,
-            "retrieved_docs": [doc.page_content for doc in retrieved_docs],
-            "was_corrected": "INCORRECT" in critique,
+            "retrieved_docs": [d.page_content for d in retrieved],
+            "was_corrected": verdict == "INCORRECT",
             "self_edit_performed": False
         }
-        
-        # Step 5: Self-edit (SEAL) if needed
-        if "INCORRECT" in critique:
-            self_edit_chain = self.create_self_edit_chain(llm)
-            edit_result = self_edit_chain.invoke({
-                "chunk": context,
-                "question": question,
-                "wrong_answer": answer
-            })
-            
+
+        if verdict == "INCORRECT" and context.strip():
+            edit_raw = self._run_chain(
+                self._seal_edit_prompt(),
+                llm,
+                chunk=context,
+                question=question,
+                wrong_answer=answer
+            )
             try:
-                edit_data = json.loads(edit_result) if isinstance(edit_result, str) else edit_result
-                
-                # Add improved context
-                self.vector_manager.add_documents(
-                    texts=[edit_data["improved_chunk"]],
-                    metadatas=[{"source": "self_edit", "original_question": question}]
-                )
-                
-                # Add Q&A pairs for future retrieval
-                qa_texts = [f"Q: {qa['question']}\nA: {qa['answer']}" 
-                            for qa in edit_data.get("qa_pairs", [])]
-                if qa_texts:
+                edit = json.loads(edit_raw) if isinstance(edit_raw, str) else edit_raw
+                improved_chunk = edit.get("improved_chunk", "").strip()
+                qa_pairs = edit.get("qa_pairs", [])
+                directives = edit.get("edit_directives", {})
+
+                if improved_chunk:
                     self.vector_manager.add_documents(
-                        texts=qa_texts,
-                        metadatas=[{"type": "qa_pair"}] * len(qa_texts)
+                        texts=[improved_chunk],
+                        metadatas=[{"source": "self_edit", "original_question": question, "type": "improved_chunk"}]
                     )
-                
+
+                if isinstance(qa_pairs, list) and qa_pairs:
+                    qa_texts = [f"Q: {qa.get('question','')}\nA: {qa.get('answer','')}" for qa in qa_pairs if qa]
+                    if qa_texts:
+                        self.vector_manager.add_documents(
+                            texts=qa_texts,
+                            metadatas=[{"source": "self_edit", "type": "qa_pair"}] * len(qa_texts)
+                        )
+
+                if directives:
+                    self.vector_manager.add_documents(
+                        texts=[json.dumps(directives, ensure_ascii=False)],
+                        metadatas=[{"source": "self_edit", "type": "edit_directives"}]
+                    )
+
                 result["self_edit_performed"] = True
-            
             except Exception as e:
                 print(f"Self-edit failed: {e}")
-        
+
         return result
