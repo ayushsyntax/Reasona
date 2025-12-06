@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# Virtual environment
+venv/
+reasona_env/
+
+# Environment files
+.env
+
+# Data and model outputs
+/data/chroma/
+data/uploads/
+*.db
+*.log
+
+# Cache
+.cache/
+*.tmp
+*.bak
+
+# IDE / OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
