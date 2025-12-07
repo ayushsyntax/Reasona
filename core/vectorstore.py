@@ -5,29 +5,45 @@
 
 from langchain_chroma import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 import chromadb
-from typing import List, Optional
+from typing import List, Optional, Union
 
 class VectorStoreManager:
-    """Fast and efficient local vector database manager."""
-
     def __init__(self, path: str = "./data/chroma"):
         self.client = chromadb.PersistentClient(path=path)
         self.embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+        self._splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=150)
 
     def get_retriever(self, collection_name: str = "docs"):
-        """Fast retriever for top-k relevant documents."""
         return Chroma(
             client=self.client,
             collection_name=collection_name,
             embedding_function=self.embeddings,
         ).as_retriever(search_kwargs={"k": 3})
 
-    def add_documents(self, texts: List[str], metadatas: Optional[List[dict]] = None, collection_name: str = "docs"):
-        """Quickly add text chunks into vectorstore."""
+    def _prepare_texts(self, texts: Union[str, List[str]]) -> List[str]:
+        if isinstance(texts, str):
+            return [d.page_content for d in self._splitter.create_documents([texts])]
+        ready = []
+        for t in texts:
+            if len(t) > 1500:
+                ready.extend([d.page_content for d in self._splitter.create_documents([t])])
+            else:
+                ready.append(t)
+        return ready
+
+    def add_documents(
+        self,
+        texts: Union[str, List[str]],
+        metadatas: Optional[List[dict]] = None,
+        collection_name: str = "docs",
+    ):
+        clean_texts = self._prepare_texts(texts)
         vectorstore = Chroma(
             client=self.client,
             collection_name=collection_name,
             embedding_function=self.embeddings,
         )
-        vectorstore.add_texts(texts=texts, metadatas=metadatas or [{}] * len(texts))
+        metadatas = metadatas or [{}] * len(clean_texts)
+        vectorstore.add_texts(texts=clean_texts, metadatas=metadatas)

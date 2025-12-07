@@ -1,6 +1,3 @@
-
----
-
 # 🧠 Reasona: A Self-Correcting RAG System (HyDE + SEAL Inspired)
 
 <div align="center">
@@ -12,10 +9,11 @@
 
 </div>
 
-<div align="center">
+---
 
+## YouTube Walkthrough
 
-</div>
+[Click Here](https://youtu.be/AZ5MW70HFck)
 
 ---
 
@@ -32,7 +30,6 @@
 - [Usage](#usage)
 - [Project Structure](#project-structure)
 - [Code Walkthrough](#code-walkthrough)
-- [YouTube Walkthrough](#youtube-walkthrough)
 - [License](#license)
 
 ---
@@ -66,25 +63,24 @@ This diagram illustrates the internal process of Reasona for each query.
 
 ```mermaid
 graph TD
-    A[User Query] --> B{Select LLM<br/>Provider}
-    B --> C[HyDE: Generate<br/>Hypothetical Answer]
-    C --> D[Vector Store: Search<br/>using Hypothetical Answer]
-    D --> E[Retrieve Context<br/>from Documents]
-    E --> F[RAG: Generate<br/>Final Answer]
-    F --> G[Critic: Evaluate<br/>Answer Correctness]
-    G --> H{Is Answer Correct?}
-    H -->|Yes| I[Return Answer<br/>to User]
-    H -->|No| J[SEAL: Generate<br/>Corrective Content]
-    J --> K[Vector Store: Add<br/>Corrective Content]
-    K --> L[Log Event]
-    L --> I
+    A[User Query] --> B[HyDE: Generate<br/>Hypothetical Answer]
+    B --> C[Vector Store: Search<br/>using Hypothetical Answer]
+    C --> D[Retrieve Context<br/>from Documents]
+    D --> E[RAG: Generate<br/>Final Answer]
+    E --> F[Critic: Evaluate<br/>Answer Correctness]
+    F --> G{Is Answer Correct?}
+    G -->|Yes| H[Return Answer<br/>to User]
+    G -->|No| I[SEAL: Generate<br/>Corrective Content]
+    I --> J[Vector Store: Add<br/>Corrective Content]
+    J --> K[Log Event]
+    K --> H
 
     style A fill:#e1f5fe
-    style I fill:#e8f5e8
-    style J fill:#fff3e0
-    style K fill:#f3e5f5
-    style H fill:#ffebee
-    style G fill:#e0f2f1
+    style H fill:#e8f5e8
+    style I fill:#fff3e0
+    style J fill:#f3e5f5
+    style G fill:#ffebee
+    style F fill:#e0f2f1
 ```
 
 ---
@@ -280,11 +276,6 @@ Reasona/
 *   **`core/vectorstore.py`:** This file contains functions to interact with ChromaDB. It handles adding documents to the database during upload and searching for relevant documents during the query process.
 *   **`core/llm_factory.py`:** This file acts as a factory for different LLM providers (Ollama, OpenAI, Google). Based on the configuration in `.env`, it returns the correct LangChain object to interact with the chosen LLM.
 
----
-
-## YouTube Walkthrough
-
-[Click Here](https://youtu.be/AZ5MW70HFck) 
 ---
 
 ## License
