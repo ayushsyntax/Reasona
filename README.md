@@ -1,269 +1,191 @@
-# 🧠 Reasona: A Self-Correcting RAG System (HyDE + SEAL Inspired)
+# 🧠 Reasona: Self-Correcting RAG (HyDE + SEAL)
 
 <div align="center">
 
-[![Python Version](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
-[![LangChain](https://img.shields.io/badge/LangChain-%23F05033.svg?style=for-the-badge&logo=langchain&logoColor=white)](https://langchain.com)
+[![Python 3.8+](https://img.shields.io/badge/Python-3.8%2B-blue?logo=python&logoColor=white)](https://www.python.org/downloads/)
+[![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
+[![LangChain](https://img.shields.io/badge/LangChain-FF9900?logo=langchain&logoColor=white)](https://langchain.com)
 [![ChromaDB](https://img.shields.io/badge/ChromaDB-1.8.1-00C853.svg)](https://www.trychroma.com/)
 
 </div>
 
 ---
 
-## YouTube Walkthrough
+## 🎥 YouTube Walkthrough
 
-[Click Here](https://youtu.be/AZ5MW70HFck)
-
----
-
-## Table of Contents
-
-- [Project Definition](#project-definition)
-- [Research Foundations](#research-foundations)
-- [The Problem & Solution](#the-problem--solution)
-- [System Flow](#system-flow)
-- [Architecture](#architecture)
-- [Features](#features)
-- [Tech Stack](#tech-stack)
-- [Installation](#installation)
-- [Usage](#usage)
-- [Project Structure](#project-structure)
-- [Code Walkthrough](#code-walkthrough)
-- [License](#license)
+👉 **[Watch Demo on YouTube](https://youtu.be/AZ5MW70HFck)**
 
 ---
 
-## Project Definition
+## What is Reasona?
 
-**Reasona** is a **Retrieval-Augmented Generation (RAG)** system designed to overcome the static nature of traditional RAG pipelines. Unlike systems that provide answers without evolving, Reasona implements a feedback loop for self-correction and persistent learning. It integrates principles inspired by **HyDE (Hypothetical Document Embeddings)** for enhanced retrieval and a simplified logic inspired by **SEAL (Self-Adapting Language Models)** to enable the system to learn from its own reasoning errors. The result is a RAG framework that not only retrieves and generates answers but also continuously refines its knowledge base based on its performance, aiming for improved accuracy over time.
+A RAG system that learns from its mistakes.
 
----
+*   Upload your PDFs, DOCX, or TXT files.
+*   Ask questions about *those* documents.
+*   Get answers based on the content of your documents.
 
-## Research Foundations
+**The key difference:** Unlike standard RAG, Reasona **learns from its mistakes**. If it gives a wrong answer, it tries to correct itself and remembers the right information for next time. It uses ideas from research papers **HyDE** (for better searching) and **SEAL** (for learning from errors).
 
-This project draws inspiration from two key research papers:
-
-*   **HyDE (Hypothetical Document Embeddings):** Based on ["Precise Zero-Shot Dense Retrieval without Relevance Labels" (Gao et al., 2022)](https://arxiv.org/abs/2212.10496). HyDE improves retrieval by generating a hypothetical answer to a query, embedding it, and using this embedding as the search query against the document corpus, often finding more relevant results than searching with the raw question.
-*   **SEAL (Self-Adapting Language Models - Inspired Logic):** Inspired by ["Self-Adapting Language Models" (Zweiger et al., 2025)](https://arxiv.org/abs/2506.10943). While the original SEAL focuses on direct weight updates, Reasona implements a *knowledge-base update* mechanism, where corrective content is generated and persisted when errors are detected.
-
----
-
-## The Problem & Solution
-
-**The Problem:** Standard RAG systems are static. They retrieve information and generate answers based on their initial index. If they provide an incorrect answer, this error is not automatically corrected for future, similar queries, leading to persistent inaccuracies.
-
-**The Solution (Reasona):** Introduces a feedback loop. The system generates answers, critically evaluates them, and if an error is detected, it creates corrective information (like improved text snippets or Q&A pairs) and adds it back to its vector store. This persistent update mechanism allows the system to learn from its mistakes and improve its future responses.
+It's designed to understand and answer questions about *your* uploaded information, improving over time.
 
 ---
 
 ## System Flow
 
-This diagram illustrates the internal process of Reasona for each query.
+This diagram shows the steps Reasona takes when you ask a question.
 
 ```mermaid
 graph TD
-    A[User Query] --> B[HyDE: Generate<br/>Hypothetical Answer]
-    B --> C[Vector Store: Search<br/>using Hypothetical Answer]
-    C --> D[Retrieve Context<br/>from Documents]
-    D --> E[RAG: Generate<br/>Final Answer]
-    E --> F[Critic: Evaluate<br/>Answer Correctness]
-    F --> G{Is Answer Correct?}
-    G -->|Yes| H[Return Answer<br/>to User]
-    G -->|No| I[SEAL: Generate<br/>Corrective Content]
-    I --> J[Vector Store: Add<br/>Corrective Content]
-    J --> K[Log Event]
-    K --> H
-
-    style A fill:#e1f5fe
-    style H fill:#e8f5e8
-    style I fill:#fff3e0
-    style J fill:#f3e5f5
-    style G fill:#ffebee
-    style F fill:#e0f2f1
+    A[You Ask: What is X?] --> B[HyDE: Generate Possible Answer<br/>X is...]
+    B --> C[Search: Find docs similar to<br/>X is...]
+    C --> D[RAG: Generate Final Answer<br/>using found docs]
+    D --> E[Critic: Check Is the answer correct?]
+    E --> F{Correct?}
+    F -->|Yes| G[Show Answer ✅]
+    F -->|No| H[SEAL: Create Correct Info<br/>Actually, X is Y]
+    H --> I[Save: Add info to knowledge base]
+    I --> G
 ```
 
 ---
 
 ## Architecture
 
-This diagram shows the high-level architecture of Reasona, including the user interface, backend API, data storage, and LLM providers.
+This diagram shows the different parts of Reasona and how they connect.
 
 ```mermaid
 graph TB
-    subgraph "User Interface"
-        UI(Streamlit UI<br/>http://localhost:8501)
+    subgraph "User Interface" 
+        UI[Streamlit UI<br/>http://localhost:8501]
     end
-
-    subgraph "Backend Services (FastAPI)"
-        BE(FastAPI Backend<br/>http://localhost:8000)
-        ENG(HyDE-SEAL Engine)
-        LLMF(LLM Factory)
+    subgraph "Backend" 
+        BE[FastAPI Server]
+        ENG[HyDE-SEAL Engine]
+        LLMF[LLM Factory]
     end
-
-    subgraph "Data Layer"
-        VDB[(ChromaDB<br/>Persistent Storage)]
-        EMB(HuggingFace Embeddings)
+    subgraph "Data Storage" 
+        VDB[(ChromaDB<br/>Your docs + learned info)]
+        EMB[HuggingFace Embeddings]
     end
-
-    subgraph "LLM Providers"
-        subgraph "Local (Ollama)"
-            OLL_SVC(Ollama Service<br/>http://127.0.0.1:11434)
-            OLL_MODEL(Local Model<br/>e.g., llama3.2)
-        end
-        subgraph "Cloud (Optional)"
-            CLOUD_API(OpenAI / Google API)
-        end
+    subgraph "AI Models" 
+        OLL[Ollama - Local]
+        API[OpenAI / Google - Cloud]
     end
-
     UI <--> BE
     BE <--> ENG
-    ENG <--> LLMF
-    LLMF -.-> OLL_SVC
-    LLMF -.-> CLOUD_API
     ENG <--> VDB
-    VDB <--> EMB
-    OLL_SVC --> OLL_MODEL
-
-    style UI fill:#e1f5fe
-    style BE fill:#f3e5f5
-    style VDB fill:#e0f2f1
-    style OLL_SVC fill:#e8f5e8
-    style CLOUD_API fill:#fff3e0
+    ENG --> LLMF
+    LLMF -.-> OLL
+    LLMF -.-> API
 ```
 
 ---
 
 ## Features
 
-| Aspect                  | Standard RAG | Reasona (HyDE + SEAL) |
-| :---------------------- | :----------- | :-------------------- |
-| Learns over time        | ❌ No        | ✅ Yes                |
-| Fixes its own mistakes  | ❌ No        | ✅ Yes                |
-| Works offline           | ❌ No        | ✅ Yes (Ollama)       |
-| Persistent vector DB    | ⚠️ Optional  | ✅ Always-on (Chroma) |
-| Transparency            | ❌ Black box | ✅ Shows sources + corrections |
+| Feature                | Standard RAG | **Reasona** |
+| :--------------------- | :----------: | :---------: |
+| Learns from feedback   |       ❌      |      ✅      |
+| Auto-corrects mistakes |       ❌      |      ✅      |
+| Works offline (Ollama) |       ❌      |      ✅      |
+| Persistent knowledge   |      ⚠️      |      ✅      |
+| Shows sources          |       ❌      |      ✅      |
 
 ---
 
 ## Tech Stack
 
-*   **Backend:** [FastAPI](https://fastapi.tiangolo.com/)
-*   **Frontend:** [Streamlit](https://streamlit.io/)
-*   **RAG Framework:** [LangChain](https://python.langchain.com/)
-*   **Vector Database:** [ChromaDB](https://www.trychroma.com/)
-*   **Embeddings:** [HuggingFace Sentence Transformers](https://huggingface.co/sentence-transformers)
-*   **LLM Interaction:** LangChain integrations (Ollama, OpenAI, Google)
-*   **Configuration:** [Pydantic Settings](https://docs.pydantic.dev/latest/concepts/pydantic_settings/)
+* **Backend Server:** FastAPI
+* **User Interface:** Streamlit
+* **RAG Framework:** LangChain
+* **Vector Database:** ChromaDB
+* **Text Embeddings:** HuggingFace
+* **AI Models:** Ollama (Local) / OpenAI / Google
+* **Configuration:** Pydantic Settings
 
 ---
 
 ## Installation
 
-### Prerequisites
-
-*   Python 3.8 or higher
-*   `pip` package manager
-*   Git (optional, for cloning)
-
-### 1. Clone the Repository
+### 1. Clone Repository
 
 ```bash
-git clone https://github.com/ayushsyntax/Reasona.git
+git clone https://github.com/ayushsyntax/Reasona.git  
 cd Reasona
 ```
 
-### 2. Set Up Python Environment
-
-It's recommended to use a virtual environment:
+### 2. Setup Environment
 
 ```bash
 python -m venv venv
-source venv/bin/activate # On Windows: venv\Scripts\activate
-```
-
-### 3. Install Python Dependencies
-
-```bash
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-### 4. Install Ollama (For Local LLMs)
-
-Ollama allows running LLMs locally. Follow the instructions on [https://ollama.ai](https://ollama.ai) for your operating system.
-
-After installation, start the Ollama service:
+### 3. Setup Ollama (Optional, for Local AI)
 
 ```bash
 ollama serve
-```
-Keep this terminal running.
-
-Pull a model (e.g., `llama3.2`):
-
-```bash
 ollama pull llama3.2
 ```
 
-### 5. Configure Environment Variables
+### 4. Create `.env` File
 
-Create a `.env` file in the project root:
+Create a file named `.env` in the `Reasona` folder with these lines:
 
 ```env
+
 LLM_PROVIDER=ollama
-MODEL_NAME=llama3.2
-# OPENAI_API_KEY=your_openai_key_here  # Optional
-# GOOGLE_API_KEY=your_google_key_here  # Optional
+MODEL_NAME=qwen3:1.7b
 OLLAMA_HOST=http://localhost:11434
 CHROMA_PATH=./data/chroma
 UPLOAD_PATH=./data/uploads
+
 ```
 
 ---
 
 ## Usage
 
-1.  **Start the Backend API:**
+```bash
+# Terminal 1: Start Backend
+python main.py
+# Terminal 2: Start Frontend
+streamlit run ui.py
+```
 
-    ```bash
-    python main.py
-    ```
-    The API will be available at `http://localhost:8000`.
+→ Visit **[http://localhost:8501](http://localhost:8501)** in your browser.
 
-2.  **Start the Streamlit UI (in a new terminal):**
-
-    ```bash
-    streamlit run ui.py
-    ```
-    The UI will be available at `http://localhost:8501`.
-
-3.  **Interact:**
-    *   Open the UI in your browser (`http://localhost:8501`).
-    *   Upload documents (PDF, DOCX, TXT).
-    *   Ask questions related to the uploaded documents.
-    *   Observe the system's answer and retrieved context.
-    *   If configured, you can switch between local (Ollama) and cloud (OpenAI/Google) models via the UI or `.env`.
+Upload your documents → Ask questions about them.
 
 ---
 
 ## Project Structure
 
+Here’s what each file does:
+
 ```
 Reasona/
-├── main.py                 # FastAPI backend entry point
-├── ui.py                   # Streamlit frontend entry point
-├── .env                    # Environment variables
-├── requirements.txt        # Python dependencies
-├── core/                   # Core application logic
-│   ├── config.py           # Configuration loading
-│   ├── models.py           # Data models (Pydantic)
-│   ├── llm_factory.py      # LLM provider selection
-│   ├── rag_engine.py       # HyDE-SEAL logic
-│   └── vectorstore.py      # ChromaDB interaction
-├── data/
-│   ├── chroma/             # ChromaDB persistents storage
-│   └── uploads/            # Temporary file uploads
-└── README.md               # This file
+├── main.py                  # 🚀 FastAPI backend entry point
+├── ui.py                    # 💬 Streamlit frontend app
+├── .env                     # 🔐 Environment variables
+├── requirements.txt          # 📦 Dependencies list
+│
+├── core/                     # 🧠 Core application logic
+│   ├── config.py             # Centralized configuration (Pydantic Settings)
+│   ├── models.py             # Request/response schemas (Pydantic models)
+│   ├── llm_factory.py        # LLM provider factory (Ollama / OpenAI / Google)
+│   ├── vectorstore.py        # ChromaDB manager + embeddings + chunking
+│   ├── rag_engine.py         # HyDE + SEAL reasoning and feedback loop
+│   └── ingest.py             # File extraction (PDF, DOCX, TXT)
+│
+├── data/                     # 📂 Persistent data layer
+│   ├── chroma/               # ChromaDB vector storage
+│   └── uploads/              # Uploaded documents
+│
+├── README.md                 # 📘 Project overview + instructions
+└── LICENSE                   # ⚖️ MIT License
 ```
 
 ---
@@ -280,6 +202,4 @@ Reasona/
 
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
-
----
+MIT © [Ayush Syntax](https://github.com/ayushsyntax)
