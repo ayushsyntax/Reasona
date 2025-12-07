@@ -1,7 +1,7 @@
 # Flow:
 # 1. Defines Pydantic models for request and response data.
 # 2. Structures queries, corrections, and responses for consistency.
-# 3. Ensures type safety and clear communication between backend and frontend.
+# 3. Ensures type safety and clear communication between backend and frontend
 
 from pydantic import BaseModel
 from typing import List, Dict, Optional

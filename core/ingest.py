@@ -1,7 +1,7 @@
 # Flow:
 # 1. Quickly detects file type and extracts text content.
 # 2. Supports PDF, DOCX, and TXT formats using lightweight loaders.
-# 3. Returns clean text ready for vectorization or retrieval.
+# 3. Returns clean text ready for vectorization or retrieval
 
 from langchain_community.document_loaders import PyMuPDFLoader, UnstructuredWordDocumentLoader, TextLoader
 import tempfile, os

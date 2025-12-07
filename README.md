@@ -261,7 +261,7 @@ Reasona/
 │   ├── rag_engine.py       # HyDE-SEAL logic
 │   └── vectorstore.py      # ChromaDB interaction
 ├── data/
-│   ├── chroma/             # ChromaDB persistent storage
+│   ├── chroma/             # ChromaDB persistents storage
 │   └── uploads/            # Temporary file uploads
 └── README.md               # This file
 ```

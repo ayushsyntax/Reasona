@@ -1,7 +1,7 @@
 # Flow:
 # 1. Launches a highly optimized FastAPI backend with concurrent RAG components.
 # 2. Uses async I/O and background executors for faster document processing.
-# 3. Minimizes latency with lightweight endpoints and efficient resource usage.
+# 3. Minimizes latency with lightweight endpoints and efficient resource usage
 
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware

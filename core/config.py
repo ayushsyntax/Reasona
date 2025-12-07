@@ -1,6 +1,6 @@
 # 1. Defines and loads configuration settings using Pydantic.
 # 2. Reads environment variables from a .env file.
-# 3. Makes settings available throughout the backend and frontend.
+# 3. Makes settings available throughout the backend and frontend
 
 from pydantic_settings import BaseSettings
 from typing import Literal

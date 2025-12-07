@@ -3,7 +3,7 @@
 # 2. Retrieves context using both the user query and hypotheses.
 # 3. Produces a concise, fact-rich answer from aggregated context.
 # 4. Uses a stricter critic to judge faithfulness and coherence.
-# 5. If incorrect, performs SEAL-style self-edit: improved chunk, QA pairs, and edit directives; persists for future learning.
+# 5. If incorrect, performs SEAL-style self-edit: improved chunk, QA pairs, and edit directives; persists for future learning
 
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser

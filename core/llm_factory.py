@@ -1,6 +1,6 @@
 # 1. Provides a factory function to select and initialize LLMs.
 # 2. Chooses the model based on provider (Ollama, OpenAI, or Google).
-# 3. Returns a ready-to-use language model instance for the app.
+# 3. Returns a ready-to-use language model instance for the app
 
 from langchain_core.language_models import BaseLanguageModel
 from langchain_openai import ChatOpenAI

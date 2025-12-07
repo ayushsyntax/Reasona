@@ -1,7 +1,7 @@
 # Flow:
 # 1. Initializes a fast persistent Chroma vector database.
 # 2. Uses lightweight HuggingFace embeddings for rapid encoding.
-# 3. Enables quick add/retrieve operations for RAG pipelines.
+# 3. Enables quick add/retrieve operations for RAG pipelines
 
 from langchain_chroma import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings

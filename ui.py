@@ -1,7 +1,7 @@
 # Flow:
 # 1. Provides a fast and clean Streamlit UI for Reasona RAG.
 # 2. Enables model selection, document upload, and contextual querying.
-# 3. Waits for backend responses without timeout interruptions.
+# 3. Waits for backend responses without timeout interruptions
 
 import streamlit as st
 import requests
