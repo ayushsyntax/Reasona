@@ -139,8 +139,11 @@ Create a file named `.env` in the `Reasona` folder with these lines:
 LLM_PROVIDER=ollama
 MODEL_NAME=qwen3:1.7b
 OLLAMA_HOST=http://localhost:11434
+#OPENAI_API_KEY=your_openai_key_here
+#GOOGLE_API_KEY=your_google_key_here
 CHROMA_PATH=./data/chroma
 UPLOAD_PATH=./data/uploads
+
 
 ```
 
